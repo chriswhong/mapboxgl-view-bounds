@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8' />
+    <title>NYC DOITT Raster Tiles in MapboxGL Example</title>
+    <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
+    <script src='https://api.tiles.mapbox.com/mapbox-gl-js/v0.42.2/mapbox-gl.js'></script>
+    <link href='https://api.tiles.mapbox.com/mapbox-gl-js/v0.42.2/mapbox-gl.css' rel='stylesheet' />
+    <style>
+        body { margin:0; padding:0; }
+        #map { position:absolute; top:0; bottom:0; width:100%; }
+        #about {
+          position: absolute;
+          top: 0;
+          left: 0;
+          z-index: 10;
+          background: #e2e2e2;
+          padding: 15px;
+          opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+
+<div id='map'>
+  <div id='about'>
+    <h3>NYC DoITT raster tiles displayed in MapboxGL</h3>
+    <p><a href="https://github.com/chriswhong/doitt-tiles-mapboxgl">Code on Github</a> | <a href="https://maps.nyc.gov/tiles/#aerial-layers-xyz">DoITT Tiles</a></p>
+  </div>
+</div>
+<script>
+  mapboxgl.accessToken = 'pk.eyJ1IjoiY3dob25nIiwiYSI6IjAyYzIwYTJjYTVhMzUxZTVkMzdmYTQ2YzBmMTM0ZDAyIn0.owNd_Qa7Sw2neNJbK6zc1A';
+  const map = new mapboxgl.Map({
+    container: 'map', // container id
+    style: 'mapbox://styles/mapbox/light-v9', //hosted style id
+    center: [-73.9661, 40.7823], // starting position
+    zoom: 14.04, // starting zoom
+    bearing: -61,
+    hash: true,
+    pitch: 27,
+  });
+
+  // add the zoom/rotate/pitch control to the map
+  map.addControl(new mapboxgl.NavigationControl());
+
+  map.on('style.load', () => {
+    // add a raster source to the map with a maxzoom of 21
+    map.addSource('aerials-2016', {
+      type: 'raster',
+      tiles: ['https://maps.nyc.gov/xyz/1.0.0/photo/2016/{z}/{x}/{y}.png8'],
+      tileSize: 256,
+      maxzoom: 21,
+    });
+
+    // add the aerials-2016 raster layer before 'waterway-label', the lowest label layer in the mapbox light-v9 style
+    map.addLayer({
+      'id': 'aerials-2016',
+      type: 'raster',
+      source: 'aerials-2016',
+    }, 'waterway-label');
+  });
+
+</script>
+
+</body>
+</html>
