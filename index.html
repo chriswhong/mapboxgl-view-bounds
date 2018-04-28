@@ -38,8 +38,8 @@
 <div id='map'>
   <div id='about'>
     <h3>Getting the viewport bounds in MapboxGL</h3>
-    <p>This demonstration uses map.unproject() to create a geojson quadrangle for the main map's view.  As you drag, zoom, pitch, and rotate the map, the polygon will update, and can be seen visualized on the inset map.</p>
-    <p>map.getBounds() does not produce the same quadrangle, rather it will return the largest "north-up" rectangle that fits within the current map view. </p>
+    <p>This demonstration uses map.unproject() to create a geojson quadrangle for the main map's view.  As you drag, zoom, pitch, and rotate the map, the polygon will update, and can be seen visualized on the inset map in blue.</p>
+    <p>map.getBounds() does not produce the same quadrangle, rather it will return the largest "north-up" rectangle that fits within the current map view. The quadrangle made from getBounds() is visualized on the inset map in red.</p>
     <p>This approach is documented in <a href="https://github.com/mapbox/mapbox-gl-js/issues/2375">this github issue</a>.
   </div>
   <div id="inset-map">
@@ -48,7 +48,7 @@
 <script>
 
   // get a geojson rectangle for the current map's view
-  const getBoundsGeoJSON = (map) => {
+  const buildViewBoundsGeoJSON = (map) => {
     const canvas = map.getCanvas();
     const { width, height } = canvas;
     const cUL = map.unproject([0, 0]).toArray();
@@ -59,6 +59,25 @@
     return {
       type: 'Polygon',
       coordinates: [[cUL, cUR, cLR, cLL, cUL]],
+      crs: {
+        type: 'name',
+        properties: {
+          name: 'EPSG:4326',
+        },
+      },
+    };
+  };
+  
+  const buildGetBoundsGeoJSON = (map) => {
+    const bounds = map.getBounds().toArray();
+    const sw = bounds[0];
+    const nw = [bounds[0][0], bounds[1][1]];
+    const ne = bounds[1];
+    const se = [bounds[1][0], bounds[0][1]];
+    
+    return {
+      type: 'Polygon',
+      coordinates: [[sw, nw, ne, se, sw]],
       crs: {
         type: 'name',
         properties: {
@@ -84,8 +103,10 @@
   
   // update the data for the bounds source when the user changes the map
   const updateBounds = () => {
-    const data = getBoundsGeoJSON(map);
-    insetMap.getSource('bounds').setData(data);
+    const viewBoundsGeoJSON = buildViewBoundsGeoJSON(map);
+    const getBoundsGeoJSON = buildGetBoundsGeoJSON(map);
+    insetMap.getSource('view-bounds').setData(viewBoundsGeoJSON);
+    insetMap.getSource('get-bounds').setData(getBoundsGeoJSON);
   }
   
   map.on('zoom', updateBounds);
@@ -105,18 +126,35 @@
   // when both map's styles are loaded, add a source and layer to the inset map to show the bounds of the main map
   const loadSourceAndData = () => {
     if (mapLoaded && insetMapLoaded) {
-      const data = getBoundsGeoJSON(map);
-      insetMap.addSource('bounds', {
+      const viewBounds = buildViewBoundsGeoJSON(map);
+      const getBounds = buildGetBoundsGeoJSON(map);
+      
+      insetMap.addSource('view-bounds', {
         type: 'geojson',
-        data,
+        data: viewBounds,
+      });
+      
+      insetMap.addSource('get-bounds', {
+        type: 'geojson',
+        data: getBounds,
       });
       
       insetMap.addLayer({
-        id: 'bounds',
+        id: 'view-bounds',
         type: 'fill',
-        source: 'bounds',
+        source: 'view-bounds',
         paint: {
           'fill-color': 'rgba(67, 107, 189, 0.38)',
+          'fill-outline-color': 'rgba(80, 80, 80, 1)', 
+        },
+      });
+      
+      insetMap.addLayer({
+        id: 'get-bounds',
+        type: 'fill',
+        source: 'get-bounds',
+        paint: {
+          'fill-color': 'rgba(255, 0, 0, 0.33)',
           'fill-outline-color': 'rgba(80, 80, 80, 1)', 
         },
       });
