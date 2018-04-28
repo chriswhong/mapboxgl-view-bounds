@@ -2,21 +2,34 @@
 <html>
 <head>
     <meta charset='utf-8' />
-    <title>NYC DOITT Raster Tiles in MapboxGL Example</title>
+    <title>Getting Viewport Bounds in MapboxGL</title>
     <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
     <script src='https://api.tiles.mapbox.com/mapbox-gl-js/v0.42.2/mapbox-gl.js'></script>
     <link href='https://api.tiles.mapbox.com/mapbox-gl-js/v0.42.2/mapbox-gl.css' rel='stylesheet' />
     <style>
         body { margin:0; padding:0; }
+        
         #map { position:absolute; top:0; bottom:0; width:100%; }
+        
         #about {
           position: absolute;
           top: 0;
           left: 0;
           z-index: 10;
-          background: #e2e2e2;
+          background: #e2e2e2b5;
           padding: 15px;
           opacity: 0.9;
+          max-width: 80%;
+        }
+        
+        #inset-map {
+          position: absolute;
+          bottom: 0;
+          left: 0;
+          height: 40%;
+          width: 40%;
+          z-index: 1;
+          border: 1px solid #808080;
         }
     </style>
 </head>
@@ -24,40 +37,103 @@
 
 <div id='map'>
   <div id='about'>
-    <h3>NYC DoITT raster tiles displayed in MapboxGL</h3>
-    <p><a href="https://github.com/chriswhong/doitt-tiles-mapboxgl">Code on Github</a> | <a href="https://maps.nyc.gov/tiles/#aerial-layers-xyz">DoITT Tiles</a></p>
+    <h3>Getting the viewport bounds in MapboxGL</h3>
+    <p>This demonstration uses map.unproject() to create a geojson quadrangle for the main map's view.  As you drag, zoom, pitch, and rotate the map, the polygon will update, and can be seen visualized on the inset map.</p>
+    <p>map.getBounds() does not produce the same quadrangle, rather it will return the largest "north-up" rectangle that fits within the current map view. </p>
+    <p>This approach is documented in <a href="https://github.com/mapbox/mapbox-gl-js/issues/2375">this github issue</a>.
+  </div>
+  <div id="inset-map">
   </div>
 </div>
 <script>
-  mapboxgl.accessToken = 'pk.eyJ1IjoiY3dob25nIiwiYSI6IjAyYzIwYTJjYTVhMzUxZTVkMzdmYTQ2YzBmMTM0ZDAyIn0.owNd_Qa7Sw2neNJbK6zc1A';
+
+  // get a geojson rectangle for the current map's view
+  const getBoundsGeoJSON = (map) => {
+    const canvas = map.getCanvas();
+    const { width, height } = canvas;
+    const cUL = map.unproject([0, 0]).toArray();
+    const cUR = map.unproject([width, 0]).toArray();
+    const cLR = map.unproject([width, height]).toArray();
+    const cLL = map.unproject([0, height]).toArray();
+
+    return {
+      type: 'Polygon',
+      coordinates: [[cUL, cUR, cLR, cLL, cUL]],
+      crs: {
+        type: 'name',
+        properties: {
+          name: 'EPSG:4326',
+        },
+      },
+    };
+  };
+  
+  
   const map = new mapboxgl.Map({
     container: 'map', // container id
-    style: 'mapbox://styles/mapbox/light-v9', //hosted style id
+    style: '//raw.githubusercontent.com/NYCPlanning/labs-gl-style/master/data/style.json', //hosted style id
     center: [-73.9661, 40.7823], // starting position
     zoom: 14.04, // starting zoom
     bearing: -61,
     hash: true,
-    pitch: 27,
+    pitch: 50,
   });
-
+  
   // add the zoom/rotate/pitch control to the map
   map.addControl(new mapboxgl.NavigationControl());
+  
+  // update the data for the bounds source when the user changes the map
+  const updateBounds = () => {
+    const data = getBoundsGeoJSON(map);
+    insetMap.getSource('bounds').setData(data);
+  }
+  
+  map.on('zoom', updateBounds);
+  map.on('drag', updateBounds);
+  map.on('pitch', updateBounds);
+  map.on('rotate', updateBounds);
+  
+  const insetMap = new mapboxgl.Map({
+    container: 'inset-map', // container id
+    style: '//raw.githubusercontent.com/NYCPlanning/labs-gl-style/master/data/style.json', //hosted style id
+    center: [-73.9661, 40.7823], // starting position
+    zoom: 9, // starting zoom
+    hash: false,
+    interactive: false,
+  });
 
+  // when both map's styles are loaded, add a source and layer to the inset map to show the bounds of the main map
+  const loadSourceAndData = () => {
+    if (mapLoaded && insetMapLoaded) {
+      const data = getBoundsGeoJSON(map);
+      insetMap.addSource('bounds', {
+        type: 'geojson',
+        data,
+      });
+      
+      insetMap.addLayer({
+        id: 'bounds',
+        type: 'fill',
+        source: 'bounds',
+        paint: {
+          'fill-color': 'rgba(67, 107, 189, 0.38)',
+          'fill-outline-color': 'rgba(80, 80, 80, 1)', 
+        },
+      });
+    };
+  };
+  
+  let mapLoaded = false;
+  let insetMapLoaded = false;
+  
   map.on('style.load', () => {
-    // add a raster source to the map with a maxzoom of 21
-    map.addSource('aerials-2016', {
-      type: 'raster',
-      tiles: ['https://maps.nyc.gov/xyz/1.0.0/photo/2016/{z}/{x}/{y}.png8'],
-      tileSize: 256,
-      maxzoom: 21,
-    });
-
-    // add the aerials-2016 raster layer before 'waterway-label', the lowest label layer in the mapbox light-v9 style
-    map.addLayer({
-      'id': 'aerials-2016',
-      type: 'raster',
-      source: 'aerials-2016',
-    }, 'waterway-label');
+    mapLoaded = true;
+    loadSourceAndData();
+  });
+  
+  insetMap.on('style.load', () => {
+    insetMapLoaded = true;
+    loadSourceAndData();
   });
 
 </script>
