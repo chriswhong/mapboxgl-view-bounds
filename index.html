@@ -8,9 +8,9 @@
     <link href='https://api.tiles.mapbox.com/mapbox-gl-js/v0.42.2/mapbox-gl.css' rel='stylesheet' />
     <style>
         body { margin:0; padding:0; }
-        
+
         #map { position:absolute; top:0; bottom:0; width:100%; }
-        
+
         #about {
           position: absolute;
           top: 0;
@@ -21,7 +21,7 @@
           opacity: 0.9;
           max-width: 80%;
         }
-        
+
         #inset-map {
           position: absolute;
           bottom: 0;
@@ -50,7 +50,14 @@
   // get a geojson rectangle for the current map's view
   const buildViewBoundsGeoJSON = (map) => {
     const canvas = map.getCanvas();
-    const { width, height } = canvas;
+    let { width, height } = canvas;
+
+    // workaround for retina displays
+    if (window.devicePixelRatio > 1) {
+      width = width * 0.5;
+      height = height * 0.5;
+    }
+
     const cUL = map.unproject([0, 0]).toArray();
     const cUR = map.unproject([width, 0]).toArray();
     const cLR = map.unproject([width, height]).toArray();
@@ -67,14 +74,14 @@
       },
     };
   };
-  
+
   const buildGetBoundsGeoJSON = (map) => {
     const bounds = map.getBounds().toArray();
     const sw = bounds[0];
     const nw = [bounds[0][0], bounds[1][1]];
     const ne = bounds[1];
     const se = [bounds[1][0], bounds[0][1]];
-    
+
     return {
       type: 'Polygon',
       coordinates: [[sw, nw, ne, se, sw]],
@@ -86,8 +93,8 @@
       },
     };
   };
-  
-  
+
+
   const map = new mapboxgl.Map({
     container: 'map', // container id
     style: '//raw.githubusercontent.com/NYCPlanning/labs-gl-style/master/data/style.json', //hosted style id
@@ -97,10 +104,10 @@
     hash: true,
     pitch: 50,
   });
-  
+
   // add the zoom/rotate/pitch control to the map
   map.addControl(new mapboxgl.NavigationControl());
-  
+
   // update the data for the bounds source when the user changes the map
   const updateBounds = () => {
     const viewBoundsGeoJSON = buildViewBoundsGeoJSON(map);
@@ -108,12 +115,12 @@
     insetMap.getSource('view-bounds').setData(viewBoundsGeoJSON);
     insetMap.getSource('get-bounds').setData(getBoundsGeoJSON);
   }
-  
+
   map.on('zoom', updateBounds);
   map.on('drag', updateBounds);
   map.on('pitch', updateBounds);
   map.on('rotate', updateBounds);
-  
+
   const insetMap = new mapboxgl.Map({
     container: 'inset-map', // container id
     style: '//raw.githubusercontent.com/NYCPlanning/labs-gl-style/master/data/style.json', //hosted style id
@@ -128,47 +135,47 @@
     if (mapLoaded && insetMapLoaded) {
       const viewBounds = buildViewBoundsGeoJSON(map);
       const getBounds = buildGetBoundsGeoJSON(map);
-      
+
       insetMap.addSource('view-bounds', {
         type: 'geojson',
         data: viewBounds,
       });
-      
+
       insetMap.addSource('get-bounds', {
         type: 'geojson',
         data: getBounds,
       });
-      
+
       insetMap.addLayer({
         id: 'view-bounds',
         type: 'fill',
         source: 'view-bounds',
         paint: {
           'fill-color': 'rgba(67, 107, 189, 0.38)',
-          'fill-outline-color': 'rgba(80, 80, 80, 1)', 
+          'fill-outline-color': 'rgba(80, 80, 80, 1)',
         },
       });
-      
+
       insetMap.addLayer({
         id: 'get-bounds',
         type: 'fill',
         source: 'get-bounds',
         paint: {
           'fill-color': 'rgba(255, 0, 0, 0.33)',
-          'fill-outline-color': 'rgba(80, 80, 80, 1)', 
+          'fill-outline-color': 'rgba(80, 80, 80, 1)',
         },
       });
     };
   };
-  
+
   let mapLoaded = false;
   let insetMapLoaded = false;
-  
+
   map.on('style.load', () => {
     mapLoaded = true;
     loadSourceAndData();
   });
-  
+
   insetMap.on('style.load', () => {
     insetMapLoaded = true;
     loadSourceAndData();
